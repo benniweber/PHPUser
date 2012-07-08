@@ -10,6 +10,14 @@ Warning: This library is not finished, and still under development!
 TODO
 --------
 A lot, when i find some more time.
+More docu!
+
+Howto
+--------
+Please do not put the index.php into your productive environment. Its only a demo.
+You need a PHP server (of course, APACHE recommended) and a MySQL database. I will add some initial SQL-Queries soon.
+Please provide your database-credentials into the config/config.php file. 
+More docu coming.
 
 LICENSE
 --------

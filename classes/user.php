@@ -1,13 +1,14 @@
 <?php
-//echo('User');
 require_once './config/config.php';
+require_once './phpass/PasswordHash.php';
 class User {
 	/* Variables */
-	protected $id = "";
+	protected $id = 0;
 	protected $name = "";
 	protected $pass = "";
 	protected $session = "";
 	protected $mail = "";
+	protected $reg = 0;
 	/*
 	protected $ = "";
 	protected $ = "";
@@ -21,6 +22,7 @@ class User {
 	 * $ret['outcome']=1 means success
 	 * $ret['outcome']=0 means failure
 	 * $ret['message']=some kind of message, you may show to your users
+	 * $ret['id']=userid, if successful, 0 otherwhise
 	 */
 	private $ret = array();
 	
@@ -41,9 +43,10 @@ class User {
 	 * $ret['outcome']=1 means user successfully registered
 	 * $ret['outcome']=0 means user not registered, due to some error
 	 * $ret['message']=some kind of message, you may show to your users
+	 * $ret['id']=userid, if successful, 0 otherwhise
 	 */
 	public function register($name, $pass, $mail){
-		
+		//DB Connection
 		$db = $this->connectDb();
 		if (is_string($db)) {
 			return $this->getErrorRet($db);
@@ -71,7 +74,7 @@ class User {
     	$sql = 'SELECT
     	id
     	FROM
-    	user
+    	phpu_user
     	WHERE
     	name = ?
     	LIMIT
@@ -92,7 +95,7 @@ class User {
     	$sql = 'SELECT
     	mail
     	FROM
-    	user
+    	phpu_user
     	WHERE
     	mail = ?
     	LIMIT
@@ -111,15 +114,15 @@ class User {
     	
     	//valid!
     	$sql = 'INSERT INTO
-    	user(name, mail, reg)
+    	phpu_user(name, mail, reg)
     	VALUES
     	(?, ?, ?)';
     	$stmt = $db->prepare($sql);
     	if (!$stmt) { //Fehler beim Query präperieren
     		return $this->getErrorRet();
     	}
-    	$time=time();
-    	$stmt->bind_param('ssi', $this->name, $this->mail, $time);
+    	$this->reg=time();
+    	$stmt->bind_param('ssi', $this->name, $this->mail, $this->reg);
     	if (!$stmt->execute()) { //Execute Error
     		return $this->getErrorRet();
     	}
@@ -127,7 +130,7 @@ class User {
     	//add pass
     	$this->id = $stmt->insert_id; 
     	$sql = 'UPDATE
-    	user
+    	phpu_user
     	SET
     	pass = ?
     	WHERE
@@ -136,10 +139,9 @@ class User {
     	if (!$stmt) { //Error    		
     		return $this->getErrorRet();
     	}
-    	//Calcutale Hash for pass
-    	require_once './phpass/PasswordHash.php';
+    	//Calculate Hash for pass
     	$t_hasher = new PasswordHash(8, FALSE);
-    	$hash = $t_hasher->HashPassword($this->pass);
+    	$hash = $t_hasher->HashPassword($this->pass.$this->id);
     	$stmt->bind_param('si', $hash, $this->id);
     	if (!$stmt->execute()) { 		
     		return $this->getErrorRet();
@@ -150,13 +152,103 @@ class User {
     	return $this->getSuccessRet(REG_SUCCESS);    
 	}
 	
+	
 	/**
 	 * Login with username and password
 	 * 
 	 * @param $name - username
 	 * @param $pass - password
+	 * @return Array, (if its not an array, something went totally wrong) 
+	 * $ret['outcome']=1 means user successfully registered
+	 * $ret['outcome']=0 means user not registered, due to some error
+	 * $ret['message']=some kind of message, you may show to your users
+	 * $ret['id']=userid, if successful, 0 otherwhise
 	 */
 	public function login($name,$pass){
+		//DB Connection
+		$db = $this->connectDb();
+		if (is_string($db)) {
+			return $this->getErrorRet($db);
+		}
+		//input not initial		
+		if (('' == $this->name = trim($name)) OR
+				('' == $this->pass = trim($pass))) {
+			return $this->getErrorRet(EMPTY_FORM);
+		}
+		
+		//Check name
+		$sql = 'SELECT
+		id, mail, reg
+		FROM
+		phpu_user
+		WHERE
+		name = ?';
+		$stmt = $db->prepare($sql);
+		if (!$stmt) { //Prepare Error
+			return $this->getErrorRet();
+		}
+		$stmt->bind_param('s', $this->name);
+		if (!$stmt->execute()) { //Execute Error
+			return $this->getErrorRet();
+		}
+		$stmt->bind_result($this->id, $this->mail, $this->reg); //bind id, mail, reg
+		if (!$stmt->fetch()) {
+			return $this->getErrorRet(INVALID_LOGIN);
+		}
+		$stmt->close();
+		//Check password
+		$sql = 'SELECT
+		pass
+		FROM
+		phpu_user
+		WHERE
+		id = ?';
+		$stmt = $db->prepare($sql);
+		if (!$stmt) { //Prepare Error
+			return $this->getErrorRet();
+		}				
+		//Bind Id 
+		$stmt->bind_param('i', $this->id);
+		if (!$stmt->execute()) { //Execute+Check Error			
+			return $this->getErrorRet();
+		}
+		$stmt->bind_result($dbHash);		
+		if (!$stmt->fetch()) {			
+			return $this->getErrorRet();
+		}
+		$stmt->close();
+		
+		//Compare Hash from DB with Hashed Pass
+		$t_hasher = new PasswordHash(8, FALSE);
+		$check = $t_hasher->CheckPassword($this->pass.$this->id, $dbHash);
+		if ($check) {
+			//Set Session
+			$sql = 'INSERT INTO
+			phpu_session(user, session, lastact)
+			VALUES
+			(?, ?, ?)';
+			$stmt = $db->prepare($sql);
+			if (!$stmt) { //Fehler beim Query präperieren
+				return $this->getErrorRet();
+			}
+			$time=time();
+			$this->session = $this->createString(30);
+			$stmt->bind_param('ssi', $this->id, $this->session, $time);
+			if (!$stmt->execute()) { //Execute Error
+				return $this->getErrorRet();
+			}
+			if (SET_COOKIES){
+				//Set Cookie         
+				setcookie('phpu_id', $this->id);
+				setcookie('phpu_session', $this->session);
+			
+				$_COOKIE['phpu_id'] = $this->id; // fake-cookie
+				$_COOKIE['phpu_session'] = $this->session; // fake-cookie
+			}			
+    		return $this->getSuccessRet(LOGIN_SUCCESS); 
+		} else {
+			return $this->getErrorRet(INVALID_LOGIN);
+		}
 		
 	}
 	
@@ -169,6 +261,142 @@ class User {
 	 * 
 	 */
 	public function checkSession(){
+		//DB Connection
+		$db = $this->connectDb();
+		if (is_string($db)) {
+			return $this->getErrorRet($db);
+		}
+    	if (!isset($_COOKIE['phpu_id'], $_COOKIE['phpu_session'])) {
+			return $this->getErrorRet(EMPTY_SESSION);
+    	}    
+		//input not initial		
+		if (('' == $this->id = trim($_COOKIE['phpu_id'])) OR
+				('' == $this->session = trim( $_COOKIE['phpu_session']))) {
+			return $this->getErrorRet(EMPTY_SESSION);
+		}
+		
+		//Check session
+		$sql = 'SELECT
+		id, lastact
+		FROM
+		phpu_session
+		WHERE
+		user = ? AND
+		session = ?';
+		$stmt = $db->prepare($sql);
+		if (!$stmt) { //Prepare Error
+			return $this->getErrorRet();
+		}
+		$stmt->bind_param('is', $this->id, $this->session);
+		if (!$stmt->execute()) { //Execute Error
+			return $this->getErrorRet();
+		}
+		$lastact = "";
+		$sessionId = "";
+		$stmt->bind_result($sessionId, $lastact); //bind id, lastact
+		if (!$stmt->fetch()) {
+			return $this->getErrorRet(INVALID_SESSION);
+		}
+		$stmt->close();
+		
+		$time=time();
+		if (abs($time-$lastact)<=SESSION_VALID_TIME){
+			//Update session			
+			$sql = 'UPDATE
+			phpu_session
+			SET
+			lastact = ?
+			WHERE
+			id = ?';
+			$stmt = $db->prepare($sql);
+			if (!$stmt) { //Error
+				return $this->getErrorRet();
+			}			
+			$stmt->bind_param('is', $time, $sessionId);
+			if (!$stmt->execute()) {
+				return $this->getErrorRet();
+			}
+			$stmt->close();
+			
+			//User information			
+			$sql = 'SELECT
+			name, pass, mail, reg
+			FROM
+			phpu_user
+			WHERE
+			id = ? ';
+			$stmt = $db->prepare($sql);
+			if (!$stmt) { //Prepare Error
+				return $this->getErrorRet();
+			}
+			$stmt->bind_param('i', $this->id);
+			if (!$stmt->execute()) { //Execute Error
+				return $this->getErrorRet();
+			}
+			$stmt->bind_result($this->name, $this->pass, $this->mail, $this->reg); //bind name, pass, mail, reg
+			if (!$stmt->fetch()) {
+				return $this->getErrorRet(INVALID_SESSION);
+			}
+			$stmt->close();
+			
+			return $this->getSuccessRet(SESSION_SUCCESS);
+			
+		} else {
+			return $this->getErrorRet(INVALID_SESSION);
+		}
+		
+		$sql = 'SELECT
+		pass
+		FROM
+		phpu_user
+		WHERE
+		id = ?';
+		$stmt = $db->prepare($sql);
+		if (!$stmt) { //Prepare Error
+			return $this->getErrorRet();
+		}				
+		//Bind Id 
+		$stmt->bind_param('i', $this->id);
+		if (!$stmt->execute()) { //Execute+Check Error			
+			return $this->getErrorRet();
+		}
+		$stmt->bind_result($dbHash);		
+		if (!$stmt->fetch()) {			
+			return $this->getErrorRet();
+		}
+		$stmt->close();
+		
+		//Compare Hash from DB with Hashed Pass
+		$t_hasher = new PasswordHash(8, FALSE);
+		$check = $t_hasher->CheckPassword($this->pass.$this->id, $dbHash);
+		if ($check) {
+			//Set Session
+			$sql = 'INSERT INTO
+			phpu_session(user, session, lastact)
+			VALUES
+			(?, ?, ?)';
+			$stmt = $db->prepare($sql);
+			if (!$stmt) { //Fehler beim Query präperieren
+				return $this->getErrorRet();
+			}
+			$time=time();
+			$this->session = $this->createString(30);
+			$stmt->bind_param('ssi', $this->id, $this->session, $time);
+			if (!$stmt->execute()) { //Execute Error
+				return $this->getErrorRet();
+			}
+			if (SET_COOKIES){
+				//Set Cookie         
+				setcookie('phpu_id', $id);
+				setcookie('phpu_session', $this->session);
+			
+				$_COOKIE['phpu_id'] = $id; // fake-cookie
+				$_COOKIE['phpu_session'] = $this->session; // fake-cookie
+			}			
+    		return $this->getSuccessRet(LOGIN_SUCCESS); 
+		} else {
+			return $this->getErrorRet(INVALID_LOGIN);
+		}
 		
 	}
 	
@@ -190,23 +418,35 @@ class User {
 		return $db;
 	}
 	
-	private function getErrorRet($message){
+	private function createString($laenge) {   
+		$zeichen = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,-_:;<>#*+!$%&/()=?";   
+		$out = "";
+		mt_srand( (double) microtime() * 1000000); 
+		for ($i=0;$i<$laenge;$i++){ 
+			$out = $out.$zeichen[mt_rand(0,(strlen($zeichen)-1))];       
+  		}         
+		return $out;   
+	}
+	
+	private function getErrorRet($message = 'Unspecified Error.'){
+		$this->id = 0;
+		$this->name = "";
+		$this->pass = "";
+		$this->session = "";
+		$this->mail = "";
+		$this->reg = "";
 		$this->ret = array();
-		if ( strlen($message) < 1){
-			$message = 'Unspecified Error.';
-		}
 		$this->ret['outcome'] = 0;
 		$this->ret['message'] = $message;
+		$this->ret['id'] = 0 ;
 		return $this->ret;
 	}
 	
-	private function getSuccessRet($message){
+	private function getSuccessRet($message = 'Success.'){
 		$this->ret = array();
-		if ( strlen($message) < 1){
-			$message = 'Unspecified Error.';
-		}
 		$this->ret['outcome'] = 1;
 		$this->ret['message'] = $message ;
+		$this->ret['id'] = $this->id ;
 		return $this->ret;
 	}
 	
@@ -231,11 +471,17 @@ class User {
 	public function setPass ($pass){
 		$this->pass = $pass;
 	}
+	public function  getSession (){
+		return $this->session;
+	}
 	public function  getMail (){
 		return $this->mail;
 	}
-	public function setId ($mail){
+	public function setMail ($mail){
 		$this->mail = $mail;
+	}
+	public function  getReg (){
+		return $this->reg;
 	}
 }
 ?>
