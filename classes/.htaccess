@@ -1,0 +1,9 @@
+AuthType Basic
+
+AuthName "ACCESS NOT POSSIBLE!"
+
+AuthUserFile /dev/null
+
+AuthGroupFile /dev/null
+
+require valid-user
