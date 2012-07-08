@@ -3,6 +3,7 @@ PHP User
 
 PHP User library.
 [Github-Repo](https://github.com/benniweber/PHPUser "PHPUser Repo").
+Warning: This library is not finished, and still under development!
 
 LICENSE
 --------
