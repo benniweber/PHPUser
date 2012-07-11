@@ -2,15 +2,21 @@ PHPUser
 --------
 
 A PHP User Management library.
+Version 0.1.
 
 Warning: This library is not finished, and still under development!
 
-[Github-Repo](https://github.com/benniweber/PHPUser "PHPUser Repo").
+Get [involved](https://github.com/benniweber/PHPUser "PHPUser Repo").
 
 TODO
 --------
 A lot, when i find some more time.
-More docu!
+- Change User data.
+- E-Mail Verification
+- More docu!
+- Provide Initial SQL Commands
+- What else? Open an [issue](https://github.com/benniweber/PHPUser/issues/new).
+
 
 Howto
 --------

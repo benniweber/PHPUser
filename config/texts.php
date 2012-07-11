@@ -27,5 +27,8 @@ define('SESSION_SUCCESS', 'Session is valid!');
 /* Logout-specific */
 define('LOGOUT_SUCCESS', 'You are logged out!');
 
+/* Logout-specific */
+define('CHANGE_SUCCESS', 'Your data was changed!');
+
 
 ?>

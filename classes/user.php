@@ -339,7 +339,7 @@ class User {
 	 * The user must be logged in properly!
 	 */
 	public function logOut(){
-		//id and pass schould be right, end that Users session
+		//id and pass should be right, end that Users session
 		//DB Connection
 		$this->db = $this->connectDb();
 		if (is_string($this->db)) {
@@ -354,15 +354,21 @@ class User {
 			id = ? AND
 			pass = ?';
 			$stmt = $this->db->prepare($sql);
-			if (!$stmt) { //Error
-				return $this->getErrorRet();
-			}			
-			$stmt->bind_param('iis', $time, $this->id, $this->pass);
-			if (!$stmt->execute()) {
-				return $this->getErrorRet();
-			}
-			$stmt->close();
-		
+		if (!$stmt) { //Error
+			return $this->getErrorRet();
+		}			
+		$stmt->bind_param('iis', $time, $this->id, $this->pass);
+		if (!$stmt->execute()) {
+			return $this->getErrorRet();
+		}
+		$stmt->close();
+			
+		if (SET_COOKIES){
+			setcookie('phpu_id', '', strtotime('-1 day'));
+			setcookie('phpu_session', '', strtotime('-1 day'));					
+			unset($_COOKIE['phpu_id']); 
+			unset($_COOKIE['phpu_session']); 
+		}
 		return $this->getSuccessRet(LOGOUT_SUCCESS);
 	}
 	
@@ -371,6 +377,7 @@ class User {
 	 * The user must be logged in properly!
 	 */
 	public function change() {
+		
 		
 	}
 	
