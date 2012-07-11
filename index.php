@@ -29,14 +29,14 @@ $ret = $user->login('test'.$time, 'test');
 //$ret = $user->login('test', 'test');
 echo('<br/>Login: Outcome: '.$ret['outcome'].', message: '.$ret['message'].', id: '.$ret['id']);
 
-echo('<br/>USER-DATA: id: '.$user->getId().', name: '.$user->getName().', pass: '.$user->getPass().', mail: '.$user->getMail().', reg: '.$user->getReg().', session: '.$user->getSession());
+echo('<br/>USER-DATA: id: '.$user->getId().', name: '.$user->getName().', pass: '.$user->getPass().', mail: '.$user->getMail().', reg: '.$user->getReg().', session: '.$user->getSession().', lastAct: '.$user->getLastAct());
 
 
 /*Session*/
 $ret = $user->checkSession();
 echo('<br/>Session: Outcome: '.$ret['outcome'].', message: '.$ret['message'].', id: '.$ret['id']);
 
-echo('<br/>USER-DATA: id: '.$user->getId().', name: '.$user->getName().', pass: '.$user->getPass().', mail: '.$user->getMail().', reg: '.$user->getReg().', session: '.$user->getSession());
+echo('<br/>USER-DATA: id: '.$user->getId().', name: '.$user->getName().', pass: '.$user->getPass().', mail: '.$user->getMail().', reg: '.$user->getReg().', session: '.$user->getSession().', lastAct: '.$user->getLastAct());
 
 
 

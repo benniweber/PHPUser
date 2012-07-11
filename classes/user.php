@@ -9,6 +9,7 @@ class User {
 	protected $session = "";
 	protected $mail = "";
 	protected $reg = 0;
+	protected $lastAct = 0;
 	/*
 	protected $ = "";
 	protected $ = "";
@@ -25,6 +26,7 @@ class User {
 	 * $ret['id']=userid, if successful, 0 otherwhise
 	 */
 	private $ret = array();
+	private $db;
 	
 	/* Methods */
 	/**
@@ -47,9 +49,9 @@ class User {
 	 */
 	public function register($name, $pass, $mail){
 		//DB Connection
-		$db = $this->connectDb();
-		if (is_string($db)) {
-			return $this->getErrorRet($db);
+		$this->db = $this->connectDb();
+		if (is_string($this->db)) {
+			return $this->getErrorRet($this->db);
 		}
 		
     	//intital values?
@@ -79,7 +81,7 @@ class User {
     	name = ?
     	LIMIT
     	1';
-    	$stmt = $db->prepare($sql);
+    	$stmt = $this->db->prepare($sql);
     	if (!$stmt) {
     		return $this->getErrorRet();
     	}
@@ -100,9 +102,9 @@ class User {
     	mail = ?
     	LIMIT
     	1';
-    	$stmt = $db->prepare($sql);
+    	$stmt = $this->db->prepare($sql);
     	if (!$stmt) {
-    		return $db->error;
+    		return $this->getErrorRet();
     	}
     	$stmt->bind_param('s', $this->mail);
     	$stmt->execute();
@@ -117,7 +119,7 @@ class User {
     	phpu_user(name, mail, reg)
     	VALUES
     	(?, ?, ?)';
-    	$stmt = $db->prepare($sql);
+    	$stmt = $this->db->prepare($sql);
     	if (!$stmt) { //Fehler beim Query präperieren
     		return $this->getErrorRet();
     	}
@@ -135,7 +137,7 @@ class User {
     	pass = ?
     	WHERE
     	id = ?';
-    	$stmt = $db->prepare($sql);
+    	$stmt = $this->db->prepare($sql);
     	if (!$stmt) { //Error    		
     		return $this->getErrorRet();
     	}
@@ -166,9 +168,9 @@ class User {
 	 */
 	public function login($name,$pass){
 		//DB Connection
-		$db = $this->connectDb();
-		if (is_string($db)) {
-			return $this->getErrorRet($db);
+		$this->db = $this->connectDb();
+		if (is_string($this->db)) {
+			return $this->getErrorRet($this->db);
 		}
 		//input not initial		
 		if (('' == $this->name = trim($name)) OR
@@ -183,7 +185,7 @@ class User {
 		phpu_user
 		WHERE
 		name = ?';
-		$stmt = $db->prepare($sql);
+		$stmt = $this->db->prepare($sql);
 		if (!$stmt) { //Prepare Error
 			return $this->getErrorRet();
 		}
@@ -203,7 +205,7 @@ class User {
 		phpu_user
 		WHERE
 		id = ?';
-		$stmt = $db->prepare($sql);
+		$stmt = $this->db->prepare($sql);
 		if (!$stmt) { //Prepare Error
 			return $this->getErrorRet();
 		}				
@@ -222,18 +224,21 @@ class User {
 		$t_hasher = new PasswordHash(8, FALSE);
 		$check = $t_hasher->CheckPassword($this->pass.$this->id, $dbHash);
 		if ($check) {
-			//Set Session
-			$sql = 'INSERT INTO
-			phpu_session(user, session, lastact)
-			VALUES
-			(?, ?, ?)';
-			$stmt = $db->prepare($sql);
+			//Set Session			
+			$sql = 'UPDATE
+			phpu_user
+			SET
+			session = ? ,
+			lastact = ?
+			WHERE
+			id = ?';
+			$stmt = $this->db->prepare($sql);
 			if (!$stmt) { //Fehler beim Query präperieren
 				return $this->getErrorRet();
 			}
 			$time=time();
 			$this->session = $this->createString(30);
-			$stmt->bind_param('ssi', $this->id, $this->session, $time);
+			$stmt->bind_param('sii', $this->session, $time, $this->id);
 			if (!$stmt->execute()) { //Execute Error
 				return $this->getErrorRet();
 			}
@@ -262,9 +267,9 @@ class User {
 	 */
 	public function checkSession(){
 		//DB Connection
-		$db = $this->connectDb();
-		if (is_string($db)) {
-			return $this->getErrorRet($db);
+		$this->db = $this->connectDb();
+		if (is_string($this->db)) {
+			return $this->getErrorRet($this->db);
 		}
     	if (!isset($_COOKIE['phpu_id'], $_COOKIE['phpu_session'])) {
 			return $this->getErrorRet(EMPTY_SESSION);
@@ -277,13 +282,13 @@ class User {
 		
 		//Check session
 		$sql = 'SELECT
-		id, lastact
+		lastact
 		FROM
-		phpu_session
+		phpu_user
 		WHERE
-		user = ? AND
+		id = ? AND
 		session = ?';
-		$stmt = $db->prepare($sql);
+		$stmt = $this->db->prepare($sql);
 		if (!$stmt) { //Prepare Error
 			return $this->getErrorRet();
 		}
@@ -292,111 +297,38 @@ class User {
 			return $this->getErrorRet();
 		}
 		$lastact = "";
-		$sessionId = "";
-		$stmt->bind_result($sessionId, $lastact); //bind id, lastact
+		$stmt->bind_result($lastact); //bind id, lastact
 		if (!$stmt->fetch()) {
 			return $this->getErrorRet(INVALID_SESSION);
 		}
 		$stmt->close();
+				
 		
 		$time=time();
 		if (abs($time-$lastact)<=SESSION_VALID_TIME){
 			//Update session			
 			$sql = 'UPDATE
-			phpu_session
+			phpu_user
 			SET
 			lastact = ?
 			WHERE
 			id = ?';
-			$stmt = $db->prepare($sql);
+			$stmt = $this->db->prepare($sql);
 			if (!$stmt) { //Error
 				return $this->getErrorRet();
 			}			
-			$stmt->bind_param('is', $time, $sessionId);
+			$stmt->bind_param('is', $time, $this->id);
 			if (!$stmt->execute()) {
 				return $this->getErrorRet();
 			}
 			$stmt->close();
-			
-			//User information			
-			$sql = 'SELECT
-			name, pass, mail, reg
-			FROM
-			phpu_user
-			WHERE
-			id = ? ';
-			$stmt = $db->prepare($sql);
-			if (!$stmt) { //Prepare Error
-				return $this->getErrorRet();
-			}
-			$stmt->bind_param('i', $this->id);
-			if (!$stmt->execute()) { //Execute Error
-				return $this->getErrorRet();
-			}
-			$stmt->bind_result($this->name, $this->pass, $this->mail, $this->reg); //bind name, pass, mail, reg
-			if (!$stmt->fetch()) {
-				return $this->getErrorRet(INVALID_SESSION);
-			}
-			$stmt->close();
-			
+						
 			return $this->getSuccessRet(SESSION_SUCCESS);
 			
 		} else {
 			return $this->getErrorRet(INVALID_SESSION);
 		}
 		
-		$sql = 'SELECT
-		pass
-		FROM
-		phpu_user
-		WHERE
-		id = ?';
-		$stmt = $db->prepare($sql);
-		if (!$stmt) { //Prepare Error
-			return $this->getErrorRet();
-		}				
-		//Bind Id 
-		$stmt->bind_param('i', $this->id);
-		if (!$stmt->execute()) { //Execute+Check Error			
-			return $this->getErrorRet();
-		}
-		$stmt->bind_result($dbHash);		
-		if (!$stmt->fetch()) {			
-			return $this->getErrorRet();
-		}
-		$stmt->close();
-		
-		//Compare Hash from DB with Hashed Pass
-		$t_hasher = new PasswordHash(8, FALSE);
-		$check = $t_hasher->CheckPassword($this->pass.$this->id, $dbHash);
-		if ($check) {
-			//Set Session
-			$sql = 'INSERT INTO
-			phpu_session(user, session, lastact)
-			VALUES
-			(?, ?, ?)';
-			$stmt = $db->prepare($sql);
-			if (!$stmt) { //Fehler beim Query präperieren
-				return $this->getErrorRet();
-			}
-			$time=time();
-			$this->session = $this->createString(30);
-			$stmt->bind_param('ssi', $this->id, $this->session, $time);
-			if (!$stmt->execute()) { //Execute Error
-				return $this->getErrorRet();
-			}
-			if (SET_COOKIES){
-				//Set Cookie         
-				setcookie('phpu_id', $id);
-				setcookie('phpu_session', $this->session);
-			
-				$_COOKIE['phpu_id'] = $id; // fake-cookie
-				$_COOKIE['phpu_session'] = $this->session; // fake-cookie
-			}			
-    		return $this->getSuccessRet(LOGIN_SUCCESS); 
-		} else {
-			return $this->getErrorRet(INVALID_LOGIN);
-		}
 		
 	}
 	
@@ -418,8 +350,14 @@ class User {
 		return $db;
 	}
 	
+	private function closeDb(){		
+		$thread_id = $this->db->thread_id;
+		$this->db->kill($thread_id);
+		$this->db->close();
+	}
+	
 	private function createString($laenge) {   
-		$zeichen = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,-_:;<>#*+!$%&/()=?";   
+		$zeichen = "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,-_:;#*+!$%&/()=?";   
 		$out = "";
 		mt_srand( (double) microtime() * 1000000); 
 		for ($i=0;$i<$laenge;$i++){ 
@@ -439,15 +377,44 @@ class User {
 		$this->ret['outcome'] = 0;
 		$this->ret['message'] = $message;
 		$this->ret['id'] = 0 ;
+		
+		$this->closeDb();
 		return $this->ret;
 	}
 	
 	private function getSuccessRet($message = 'Success.'){
+		//User information from DB
+		$this->readUserFromDb();
 		$this->ret = array();
 		$this->ret['outcome'] = 1;
 		$this->ret['message'] = $message ;
 		$this->ret['id'] = $this->id ;
+		
+		$this->closeDb();
 		return $this->ret;
+	}
+	
+	private function readUserFromDb() {
+		//User information
+		$sql = 'SELECT
+		name, pass, mail, reg, session, lastact
+		FROM
+		phpu_user
+		WHERE
+		id = ? ';
+		$stmt = $this->db->prepare($sql);
+		if (!$stmt) { //Prepare Error
+			return false;//$this->getErrorRet();
+		}
+		$stmt->bind_param('i', $this->id);
+		if (!$stmt->execute()) { //Execute Error
+			return false;//return $this->getErrorRet();
+		}
+		$stmt->bind_result($this->name, $this->pass, $this->mail, $this->reg, $this->session, $this->lastAct); //bind name, pass, mail, reg
+		if (!$stmt->fetch()) {
+			return false;//return $this->getErrorRet(INVALID_SESSION);
+		}
+		$stmt->close();
 	}
 	
 	/* Getter/Setter */
@@ -482,6 +449,9 @@ class User {
 	}
 	public function  getReg (){
 		return $this->reg;
+	}
+	public function  getLastAct (){
+		return $this->lastAct;
 	}
 }
 ?>
