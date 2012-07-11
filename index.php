@@ -38,6 +38,18 @@ echo('<br/>Session: Outcome: '.$ret['outcome'].', message: '.$ret['message'].', 
 
 echo('<br/>USER-DATA: id: '.$user->getId().', name: '.$user->getName().', pass: '.$user->getPass().', mail: '.$user->getMail().', reg: '.$user->getReg().', session: '.$user->getSession().', lastAct: '.$user->getLastAct());
 
+/* Logout */
+$ret = $user->logOut();
+echo('<br/>Logout: Outcome: '.$ret['outcome'].', message: '.$ret['message'].', id: '.$ret['id']);
+
+echo('<br/>USER-DATA: id: '.$user->getId().', name: '.$user->getName().', pass: '.$user->getPass().', mail: '.$user->getMail().', reg: '.$user->getReg().', session: '.$user->getSession().', lastAct: '.$user->getLastAct());
+
+/*Session after Logout?*/
+$ret = $user->checkSession();
+echo('<br/>Session: Outcome: '.$ret['outcome'].', message: '.$ret['message'].', id: '.$ret['id']);
+
+echo('<br/>USER-DATA: id: '.$user->getId().', name: '.$user->getName().', pass: '.$user->getPass().', mail: '.$user->getMail().', reg: '.$user->getReg().', session: '.$user->getSession().', lastAct: '.$user->getLastAct());
+
 
 
 ?>

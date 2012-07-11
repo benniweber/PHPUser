@@ -280,6 +280,10 @@ class User {
 			return $this->getErrorRet(EMPTY_SESSION);
 		}
 		
+		if (!$this->session){
+			return $this->getErrorRet(INVALID_SESSION);
+		} 
+		
 		//Check session
 		$sql = 'SELECT
 		lastact
@@ -317,7 +321,7 @@ class User {
 			if (!$stmt) { //Error
 				return $this->getErrorRet();
 			}			
-			$stmt->bind_param('is', $time, $this->id);
+			$stmt->bind_param('ii', $time, $this->id);
 			if (!$stmt->execute()) {
 				return $this->getErrorRet();
 			}
@@ -328,8 +332,38 @@ class User {
 		} else {
 			return $this->getErrorRet(INVALID_SESSION);
 		}
+	}
+	
+	/**
+	 * Log the User out!
+	 * The user must be logged in properly!
+	 */
+	public function logOut(){
+		//id and pass schould be right, end that Users session
+		//DB Connection
+		$this->db = $this->connectDb();
+		if (is_string($this->db)) {
+			return $this->getErrorRet($this->db);
+		}	
+		//Update session to 0
+		$sql = 'UPDATE
+			phpu_user
+			SET
+			session = ?
+			WHERE
+			id = ? AND
+			pass = ?';
+			$stmt = $this->db->prepare($sql);
+			if (!$stmt) { //Error
+				return $this->getErrorRet();
+			}			
+			$stmt->bind_param('iis', $time, $this->id, $this->pass);
+			if (!$stmt->execute()) {
+				return $this->getErrorRet();
+			}
+			$stmt->close();
 		
-		
+		return $this->getSuccessRet(LOGOUT_SUCCESS);
 	}
 	
 	/**
@@ -350,10 +384,12 @@ class User {
 		return $db;
 	}
 	
-	private function closeDb(){		
-		$thread_id = $this->db->thread_id;
-		$this->db->kill($thread_id);
-		$this->db->close();
+	private function closeDb(){	
+		if (is_object($this->db)) {			
+			$thread_id = $this->db->thread_id;
+			$this->db->kill($thread_id);
+			$this->db->close();
+		}
 	}
 	
 	private function createString($laenge) {   
@@ -373,6 +409,7 @@ class User {
 		$this->session = "";
 		$this->mail = "";
 		$this->reg = "";
+		$this->lastAct = "";
 		$this->ret = array();
 		$this->ret['outcome'] = 0;
 		$this->ret['message'] = $message;

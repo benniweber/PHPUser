@@ -24,5 +24,8 @@ define('EMPTY_SESSION', 'Session-Cookies are missing.');
 define('INVALID_SESSION', 'Invalid session, login again.');
 define('SESSION_SUCCESS', 'Session is valid!');
 
+/* Logout-specific */
+define('LOGOUT_SUCCESS', 'You are logged out!');
+
 
 ?>
